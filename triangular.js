@@ -36,29 +36,14 @@ DEALINGS IN THE SOFTWARE.
 // TRIANGULAR SERVER REQUIREMENTS
 // -------------------------------------------------------------------------------------------------
 
-var FS                  = require("fs");
-var KOA                 = require('koa');                   // KOA Framework
-var BodyParser          = require('koa-body-parser');       // Handles parsing post bodies
-var StaticServer        = require('koa-static');            // Serves static files
-var Router              = require('koa-router');            // Application Routing
-var Resource            = require('koa-resource-router');   // Handles Resource Routing
-var Routes              = require('./config/router')        // Location of application routing
 var Colors              = require('colors');                // Allow showing colors
-var Path                = require('path');
-var Session             = require('koa-session-redis');     // Redis for Session Storage
-var Startup             = require('./core/startup.js');
-
-// -------------------------------------------------------------------------------------------------
-// TRIANGULAR GLOBALS
-// -------------------------------------------------------------------------------------------------
-
-GLOBAL.DB               = require('./config/db')        // Reference to the Application DB
-GLOBAL._                = require('lodash')             // Reference to the Application DB
+var TriangularStartup   = require('./core/startup.js');     // Kicks off triangular
+var TriangularGlobals   = require('./core/globals.js');     // Creates triangular globals manager
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR SETUP
 // -------------------------------------------------------------------------------------------------
 
-GLOBAL.Triangular = Startup.run();
+GLOBAL.Triangular = TriangularStartup.run();
 
 
