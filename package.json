@@ -1,0 +1,38 @@
+{
+  "name": "triangular",
+  "version": "0.0.1",
+  "description": "TriangularJS is a full stack application framworking inucluding database (MonogDB), server (Koa), api, and front-end (AngularJS) all tied together with generators and model based API.",
+  "main": "triangular.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "none"
+  },
+  "dependencies": {
+    "koa": "^0.8.2",
+    "koa-static": "^1.4.6",
+    "co-body": "^1.0.0",
+    "koa-route": "^1.1.4",
+    "lodash": "^2.4.1",
+    "colors": "^0.6.2",
+    "path": "^0.4.9",
+    "koa-body-parser": "^1.1.0",
+    "koa-session-redis": "^1.1.0",
+    "mongoose": "^3.8.14",
+    "koa-router": "^3.2.3",
+    "koa-resource-router": "^0.3.3"
+  },
+  "keywords": [
+    "triangular",
+    "koa",
+    "koajs",
+    "framework",
+    "angular",
+    "angularjs",
+    "backend"
+  ],
+  "author": "Thomas Brian <tdbrian@gmail.com>",
+  "license": "MIT"
+}
