@@ -33,62 +33,60 @@ DEALINGS IN THE SOFTWARE.
 // TRIANGULAR SERVER REQUIREMENTS
 // -------------------------------------------------------------------------------------------------
 
-var KOA                 = require('koa');                       // KOA Framework
-var BodyParser          = require('koa-body-parser');           // Handles parsing post bodies
-var Colors              = require('colors');                    // Allow showing colors
+var KOA = require('koa');
+var BodyParser = require('koa-body-parser');
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR HOOKS
 // -------------------------------------------------------------------------------------------------
 
-var TriangularRouter    = require('../hooks/routing/Router');   // Sets up routing
-
-// -------------------------------------------------------------------------------------------------
-// APPLICATION SPECIFIC CONFIG
-// -------------------------------------------------------------------------------------------------
-
-var cofigDirectory      = Path.join(process.cwd(), 'config');
-var appConfig           = require('cofigDirectory/app');        // Application specific properties
-var db                  = require('cofigDirectory/db');         // Database specific properties
-var api                 = require('cofigDirectory/api');        // Database specific properties
+// @private {object:TriangularRouter} The application automated routing
+var TriangularRouter = require('../hooks/routing/router');
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR SETUP
 // -------------------------------------------------------------------------------------------------
 
-exports.module = {
+module.exports = {
 
-  run = function () {
+  start: function (app) {
 
-    // Setup Koa
-    var triangular = KOA();
+    // -------------------------------------------------------------------------------------------------
+    // PREP TRIANGULAR
+    // -------------------------------------------------------------------------------------------------
 
-    // Set Triangular App Properties
-    triangular.app = {};
-    triangular.app.name = appConfig.name;
+    var triangularBase = KOA();
 
-    // The request body parser
-    triangular.use(BodyParser());
+    // -------------------------------------------------------------------------------------------------
+    // ADD BODY PARSING
+    // -------------------------------------------------------------------------------------------------
+
+    triangularBase.use(BodyParser());
 
     // -------------------------------------------------------------------------------------------------
     // TRIANGULAR ROUTING HOOK SETUP
     // -------------------------------------------------------------------------------------------------
 
     // Create App Router
-    var appRouting = new TriangularRouter(triangular);
+    var appRouter = new TriangularRouter(triangularBase);
 
     // Sets up automated routing via configuration and controllers
-    appRouting.setupControllerRouting();
+    appRouter.setupControllerRouting();
 
     // -------------------------------------------------------------------------------------------------
     // TRIANGULAR STARTUP
     // -------------------------------------------------------------------------------------------------
 
-    triangular.listen(appConfig.port);
-    console.log('BES+Tech API Server Running ON'.green + ' http://localhost:3812'.yellow);
+    triangularBase.listen(app.port);
+
+    console.info( app.name.green + ' Running ON'.green + ' http://localhost:'.yellow +
+      String(app.port).yellow);
 
     // Pass back the triangular application from the run method
-    return triangular;
+    return {
+      base: triangularBase,
+      router: appRouter
+    };
 
   }
 

@@ -36,14 +36,54 @@ DEALINGS IN THE SOFTWARE.
 // TRIANGULAR SERVER REQUIREMENTS
 // -------------------------------------------------------------------------------------------------
 
-var Colors              = require('colors');                // Allow showing colors
-var TriangularStartup   = require('./core/startup.js');     // Kicks off triangular
-var TriangularGlobals   = require('./core/globals.js');     // Creates triangular globals manager
+var Klass = require('klass');
 
 // -------------------------------------------------------------------------------------------------
-// TRIANGULAR SETUP
+// The Triangular class.
+// @return {void}
 // -------------------------------------------------------------------------------------------------
 
-GLOBAL.Triangular = TriangularStartup.run();
+var Triangular = Klass({
 
+  initialize: function(appConfig) {
+
+    // @public {string} The application name
+    this.name = appConfig.name;
+
+    // @public {number} Application port
+    this.port = appConfig.port;
+
+    // @public {object} The underlying base application
+    this.base = {};
+
+    // Runs startup on the app
+    this.setup();
+
+  },
+
+  // -------------------------------------------------------------------------------------------------
+  // Starts up Triagnular
+  // @return {void}
+  // -------------------------------------------------------------------------------------------------
+
+  setup: function() {
+
+    // -------------------------------------------------------------------------------------------------
+    // TRIANGULAR STARTUP
+    // -------------------------------------------------------------------------------------------------
+
+    // Startup triangular and get the startup parts
+    var triangularParts = require('./startup.js').start(this);
+    this.base = triangularParts.base;
+    // this.router = triangularParts.router;
+
+  }
+
+});
+
+// -------------------------------------------------------------------------------------------------
+// MODULE EXPORT
+// -------------------------------------------------------------------------------------------------
+
+module.exports = Triangular;
 

@@ -1,5 +1,5 @@
 /**
-* @fileoverview Manages all triangular globals
+* @fileoverview Manages all triangular globals.
 *
 * @author <tdbrian@gmail.com> (Thomas Brian)
 * @version 0.0.1 2014-08-06 <tdbrian@gmail.com> (Thomas Brian)
@@ -30,26 +30,54 @@ DEALINGS IN THE SOFTWARE.
 **/
 
 // -------------------------------------------------------------------------------------------------
+// TRIANGULAR SERVER REQUIREMENTS
+// -------------------------------------------------------------------------------------------------
+
+var FS = require('fs');
+
+// -------------------------------------------------------------------------------------------------
 // TRIANGULAR GLOBALS
 // -------------------------------------------------------------------------------------------------
 
-exports.moldule = {
+module.exports = {
 
-  triangularGlobals = [],
+  triangularGlobals: [],
 
   // --------------------------------------------------------------------------------
   // Sets up default triangular globals
   // @return {void}
   // --------------------------------------------------------------------------------
 
-  setupDefault = function (triangular) {
+  setupDefault: function () {
 
-    // Adds lodash to globals as an underscore
-    loadash = require('loash');
-    this.add('_', loadash);
+    var self = this;
 
-    // Add triangular app to globals
-    this.add('triangular', triangular);
+    // Setup TA namespace in node globals
+    GLOBAL.TA = {};
+
+    // Setup Globals Space
+    TA = {}
+
+    // First add lodash to begin using it here (lodash is not in config)
+    this.addModule('_', 'lodash');
+
+    // Add application logger to globals
+    this.addLogger();
+
+    // Get global modules to be added
+    var defaultGlobals = require('../config/defaultGlobals');
+    var globalModules = defaultGlobals.modules;
+    var globalProperties = defaultGlobals.properties;
+
+    // Adds each moduel from globals config
+    TA._.forOwn(globalModules, function(packageName, refName) {
+      self.addModule(refName, packageName);
+    });
+
+    // Adds each property from globals config
+    TA._.forOwn(globalProperties, function(packageName, refName) {
+      self.add(refName, packageName);
+    });
 
   },
 
@@ -60,13 +88,13 @@ exports.moldule = {
   // @return {void}
   // --------------------------------------------------------------------------------
 
-  add = function (name, item) {
+  add: function (name, item) {
 
-    // Tack global items
-    this.triangularGlobals.push[name];
+    // // Tack global items
+    this.triangularGlobals.push(name);
 
     // Add to the global stack
-    global[name] = item;
+    GLOBAL.TA[name] = item;
 
   },
 
@@ -76,7 +104,7 @@ exports.moldule = {
   // @return {void}
   // --------------------------------------------------------------------------------
 
-  remove = function (name) {
+  remove: function (name) {
 
     // Removes from tracked triangular globals
     var index = array.indexOf(name);
@@ -85,7 +113,39 @@ exports.moldule = {
     }
 
     // Removes from globals
-    delete global[name];
+    delete TA[name];
+
+  },
+
+  // --------------------------------------------------------------------------------
+  // Adds a new global module
+  // @param {string} The name of the item to add
+  // @param {mixed} The item to add to the globals space
+  // @return {void}
+  // --------------------------------------------------------------------------------
+
+  addModule: function (name, item) {
+
+    // Tack global items
+    this.triangularGlobals.push(name);
+
+    // Add to the global stack
+    TA[name] = require(item);
+
+  },
+
+  // --------------------------------------------------------------------------------
+  // Adds application logger
+  // @return {void}
+  // --------------------------------------------------------------------------------
+
+  addLogger: function () {
+
+    // Tack global items
+    this.triangularGlobals.push('logger');
+
+    // Add to the global stack
+    TA.logger = require('tracer').colorConsole({level:'debug'});
 
   },
 
@@ -94,8 +154,8 @@ exports.moldule = {
   // @return {array} Returns the array of TA Globals
   // --------------------------------------------------------------------------------
 
-  list = function () {
-    return triangularGlobals
+  list: function () {
+    return this.triangularGlobals;
   },
 
   // --------------------------------------------------------------------------------
@@ -103,8 +163,8 @@ exports.moldule = {
   // @return {string} Returns a comma split string of TA Globals
   // --------------------------------------------------------------------------------
 
-  toString = function () {
-    return triangularGlobals.toString();
+  toString: function () {
+    return this.triangularGlobals.toString();
   }
 
 }

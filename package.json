@@ -2,7 +2,7 @@
   "name": "triangular",
   "version": "0.0.1",
   "description": "TriangularJS is a full stack application framworking inucluding database (MonogDB), server (Koa), api, and front-end (AngularJS) all tied together with generators and model based API.",
-  "main": "triangular.js",
+  "main": "triangularFramework.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -23,7 +23,13 @@
     "mongoose": "^3.8.14",
     "koa-router": "^3.2.3",
     "koa-resource-router": "^0.3.3",
-    "koa-mount": "^1.3.0"
+    "koa-mount": "^1.3.0",
+    "klass": "^1.4.0",
+    "winston": "^0.7.3",
+    "tracer": "^0.7.1",
+    "thunkify": "^2.1.2",
+    "co": "^3.1.0",
+    "wait.for-es6": "^0.1.0"
   },
   "keywords": [
     "triangular",

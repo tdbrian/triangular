@@ -34,17 +34,28 @@ DEALINGS IN THE SOFTWARE.
 // TRIANGULAR ROUTER REQUIREMENTS
 // -------------------------------------------------------------------------------------------------
 
-var FS                  = require("fs");                    // File system access
-var KOARouter           = require('koa-router');            // Application Routing
-var Resource            = require('koa-resource-router');   // Handles Resource Routing
-var Mount               = require('koa-mount');             // For mounting KOA middleware
-var Path                = require('path');                  // Used for getting file paths
+// @private {object} Utility for file systems calls
+var FS = require("fs");
 
-// -------------------------------------------------------------------------------------------------
-// MODULE EXPORT
-// -------------------------------------------------------------------------------------------------
+// @private {object} Utility for Classes
+var Klass = require('klass');
 
-module.exports = Router;
+// @private {object:KOARouter} Bassis of application routing
+var KOARouter = require('koa-router');
+
+// @private {object:ResourceRouter} Basis for API routing resources
+var Resource = require('koa-resource-router');
+
+// @private {object:StaticServer} Handles serving static files
+var StaticServer = require('koa-static');
+
+// @private {object:KOAMount} Used for mounting routes on the middleware
+var Mount = require('koa-mount');
+
+// @private {object:Path} Used for forming up file paths
+var Path = require('path');
+
+var self;
 
 // -------------------------------------------------------------------------------------------------
 // The router class.
@@ -52,177 +63,157 @@ module.exports = Router;
 // @return {void}
 // -------------------------------------------------------------------------------------------------
 
-function Router (triangular) {
+var Router = Klass({
 
-  // @public {object:Triangular} // The triangular application to add the routing to
-  this.triangularAPP = triangular;
+  // @public {object:RoutesCollection} API versioning Routes indexed by name
+  routeAPIVersions: {},
 
-  // @public {object:RoutesCollection} // API versioning Routes indexed by name
-  this.routeAPIVersions = {};
+  // @public {object:Strings} All automatically loaded controllers & routing
+  loadedControllers: {},
 
-  // @public {object:Strings} // All setup application routes
-  this.triangularAPP.routes = {};
+  initialize: function (triangular) {
 
-  // @public {object:Strings} // All automatically loaded controllers & routing
-  this.loadedControllers = {};
+    self = this;
 
-}
+    // @public {object:Triangular} // The triangular application to add the routing to
+    this.triangularAPP = triangular;
 
-// -------------------------------------------------------------------------------------------------
-// Add API versioning mount
-// @param {string} The name of the router which can used later for reference.
-// @return {void}
-// -------------------------------------------------------------------------------------------------
+    // @public {object:Strings} All setup application routes
+    this.triangularAPP.routes = {};
 
-Router.prototype.addAPIVersionMount = function(name) {
+    // Attach router to triangular app
+    triangular.use(KOARouter(triangular));
 
-  // Create route with name
-  var newKOARouter = new KOARouter();
-  this.triangularAPP.use(mount(('/' + name), newKOARouter.middleware()));
+  },
 
-  // Add to the Triangular Router versions
-  this.routeAPIVersions[name] = newKOARouter;
+  // -------------------------------------------------------------------------------------------------
+  // Adds automated controller routing to the application
+  // @param {}
+  // @return {void}
+  // -------------------------------------------------------------------------------------------------
 
-}
+  setupControllerRouting: function() {
 
-// -------------------------------------------------------------------------------------------------
-// Add base routing mounting
-// @param {string} The base routing mount '/'
-// to ensure the API routes are used before the base routing.
-// @return {void}
-// -------------------------------------------------------------------------------------------------
+    var controllersDirectory = Path.join(process.cwd(), 'api', 'controllers');
 
-Router.prototype.addBaseMount = function() {
+    FS.readdirSync(controllersDirectory).forEach(function(file) {
 
-  // Create route with name
-  var baseKOARouter = new KOARouter();
-  this.triangularAPP.use(mount(baseKOARouter.middleware()));
+      // Get controller and added to loaded controllers
+      var controller = require(Path.join(process.cwd(), "api", "controllers", file));
 
-  // Add to the Triangular Router versions
-  this.routeAPIVersions.base = baseKOARouter;
+      // Strip controller extension
+      var controllerName = file.substr(0, file.lastIndexOf('.')) || file;
 
-}
+      // Add to loaded controllers for access later
+      self.loadedControllers[controllerName] = controller;
 
-// -------------------------------------------------------------------------------------------------
-// Adds automated controller routing to the application
-// @param {}
-// @return {void}
-// -------------------------------------------------------------------------------------------------
+      // Create a route for each controller
+      TA._.forEach(controller, function (controllerFunctions, fnName) {
 
-Router.prototype.setupControllerRouting = function() {
+        var verb;           // The function verb
+        var name;           // The function name
+        var path;           // The path to the function route
 
-  var self = this;
-  var controllersDirectory = Path.join(process.cwd(), 'api', 'controllers');
+        // Check if function name includes verb
+        if (fnName.indexOf('_') > -1) {
+          var fnParts = fnName.split('_');
+          verb = fnParts[0].toLowerCase();
+          name = fnParts[1].toLowerCase();
+        } else {
+          // console.log('setting default get...');
+          verb = 'get';
+          name = fnName;
+        }
 
-  FS.readdirSync(controllersPath).forEach(function(file) {
+        // Create route path
+        var modControllerName = controllerName.replace('Controller', '').toLowerCase();
+        var path = '/' + modControllerName + '/' + name;
 
-    // Get controller and added to loaded controllers
-    var controller = require("./api/controllers/" + file);
+        // Create route
+        try {
+          self.triangularAPP[verb](path, controller[fnName]);
+        } catch (err) {
+          console.log(err);
+          throw new Error('Route function ' + name + ' setup error.');
+        }
 
-    // Strip controller extension
-    var controllerName = file.substr(0, file.lastIndexOf('.')) || file;
+      })
 
-    // Add to loaded controllers for access later
-    self.loadedControllers[controllerName] = controller;
+    });
 
-    // Create a route for each controller
-    _.forEach(controller, function (controllerFunctions, fnName) {
+    // Setup app(s) based on project apps configuration file
+    var routesConfig = require(TA.appConfig + 'router');
 
-      var verb;           // The function verb
-      var name;           // The function name
-      var path;           // The path to the function route
+    // Add each route from config routes
+    TA._.forEach(routesConfig, function (routePair, path) {
 
-      // Check if function name includes verb
-      if (fnName.indexOf('_') > -1) {
-        var fnParts = fnName.split('_');
-        verb = fnParts[0].toLowerCase();
-        name = fnParts[1].toLowerCase();
+      var pathParts;                    // The parts of the path from the route config 'post /hello'
+      var verb;                         // The route config verb (get, post, put, remove)
+      var path;                         // The URL path '/hello'
+      var definedVerb = false           // Specifies if route verb was defined
+
+      // If a space in the path, the first part is expected to be the route verb
+      if (path.indexOf(' ') > -1) {
+        pathParts = path.split(' ');
+        verb = pathParts[0];
+        path = pathParts[1];
+        definedVerb = true;
+
+      // Default no verb to a get
       } else {
-        // console.log('setting default get...');
         verb = 'get';
-        name = fnName;
       }
 
-      // Create route path
-      var modControllerName = controllerName.replace('Controller', '').toLowerCase();
-      // console.log('modified controller name:', modControllerName);
-      var path = '/' + modControllerName + '/' + name;
-      // routePaths.push[] = ;
+      // Expecting route pair to contain a '.' to split the controller and function
+      // Notify if not the correct format for routing
+      if (routePair.indexOf('.') > -1) {
 
-      // Create route
-      try {
-        triangularAPP[verb](path, controller[fnName]);
-      } catch (err) {
-        throw new Error('Route function ' + fullname + ' setup error.');
-      }
+        // Get controller combo parts (controller and function names)
+        var controllerCombo = routePair.split('.');
 
-    })
+        // Available controller functions
+        var availableFn = TA._.keys(self.loadedControllers[controllerCombo[0]])
+        var fnName;
 
-  });
+        // Check if there is a controller function with same verb
+        if (verb == 'get' && TA._.contains(availableFn, 'get_' + controllerCombo[1])) {
+          fnName = 'get_' + controllerCombo[1];
 
-  // Add each route from config routes
-  _.forEach(Routes, function (routePair, path) {
+        // If the verb was defined, only us a function with ver defined
+        } else if (definedVerb && TA._.contains(['post', 'put', 'delete'], verb)) {
+          fnName = verb + '_' + controllerCombo[1]
 
-    var pathParts;                    // The parts of the path from the route config 'post /hello'
-    var verb;                         // The route config verb (get, post, put, remove)
-    var path;                         // The URL path '/hello'
-    var definedVerb = false           // Specifies if route verb was defined
+        // If verb not defined.. and no matching 'get_' then set to original name
+        } else {
+          fnName = controllerCombo[1];
+        }
 
-    // If a space in the path, the first part is expected to be the route verb
-    if (path.indexOf(' ') > -1) {
-      pathParts = path.split(' ');
-      verb = pathParts[0];
-      path = pathParts[1];
-      definedVerb = true;
+        var routeFunction = self.loadedControllers[controllerCombo[0]][fnName];
 
-    // Default no verb to a get
-    } else {
-      verb = 'get';
-    }
-
-    // Expecting route pair to contain a '.' to split the controller and function
-    // Notify if not the correct format for routing
-    if (routePair.indexOf('.') > -1) {
-
-      // Get controller combo parts (controller and function names)
-      var controllerCombo = routePair.split('.');
-
-      // Available controller functions
-      var availableFn = _.keys(self.loadedControllers[controllerCombo[0]])
-      var fnName;
-
-      // Check if there is a controller function with same verb
-      if (verb == 'get' && _.contains(availableFn, 'get_' + controllerCombo[1])) {
-        fnName = 'get_' + controllerCombo[1];
-
-      // If the verb was defined, only us a function with ver defined
-      } else if (definedVerb && _.contains(['post', 'put', 'delete'], verb)) {
-        fnName = verb + '_' + controllerCombo[1]
-
-      // If verb not defined.. and no matching 'get_' then set to original name
       } else {
-        fnName = controllerCombo[1];
+        throw new Error('Controller for route ' + path + ' in router.js is incorrect format');
       }
 
-      var routeFunction = self.loadedControllers[controllerCombo[0]][fnName];
+      // Attempt to setup route
+      try {
+        self.triangularAPP[verb](path, routeFunction);
+        // routePaths.push()
+      } catch (err) {
+        console.log(err);
+        throw new Error('Controller and function for ' + verb + ' route "' + path + '" in router.js ' +
+          'does not exist');
+      }
 
-    } else {
-      throw new Error('Controller for route ' + path + ' in router.js is incorrect format');
-    }
+    });
 
-    // Attempt to setup route
-    try {
-      self.triangularAPP[verb](path, routeFunction);
-      // routePaths.push()
-    } catch (err) {
-      console.log(err);
-      throw new Error('Controller and function for ' + verb + ' route "' + path + '" in router.js ' +
-        'does not exist');
-    }
+  }
 
-  });
+});
 
-}
+// -------------------------------------------------------------------------------------------------
+// MODULE EXPORT
+// -------------------------------------------------------------------------------------------------
 
+module.exports = Router;
 
 
