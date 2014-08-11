@@ -41,9 +41,6 @@ var klass = require('klass');
 // TRIANGULAR DATABASE CLASS
 // -------------------------------------------------------------------------------------------------
 
-// @private {object} Reference to this class
-var self;
-
 // @public {object:TriangularFramework} The Triangular Framework Object
 var MongoDatabase = klass ({
 
@@ -54,9 +51,6 @@ var MongoDatabase = klass ({
 
     // @public {object:Mongoose} Used for mongoDB object relation mapping
     this.Mongoose = require('mongoose');
-
-    // Set self to this class
-    self = this;
 
     // @private {config} Database Configuration
     this._dbConfig = dbConfig;
@@ -84,9 +78,12 @@ var MongoDatabase = klass ({
     // Crreate connection
     this.connection = new MongoConnection(connectionSettings);
 
+    var name = this.name;
+
     // Attempt connect
     this.connection.connect(function() {
-      var connectionNotification = self.name+' Database Connection Made in mode: '+TA.mode;
+      var connectionNotification = name.bold+' Database Connection Made in mode: '+
+      TA.mode.underline.yellow;
       console.log(connectionNotification.green);
       cb();
     })

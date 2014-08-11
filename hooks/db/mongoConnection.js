@@ -37,16 +37,10 @@ DEALINGS IN THE SOFTWARE.
 // @public {object:Klass} Handles creating classes in Triangular
 var klass = require('klass');
 
-// @public {object:Mongoose} Used for mongoDB object relation mapping
-var Mongoose = require('mongoose');
-
 // -------------------------------------------------------------------------------------------------
 // The Connection class
 // @return {void}
 // -------------------------------------------------------------------------------------------------
-
-// @private {object} Reference to this class
-var self;
 
 // @public {object:TriangularFramework} The Triangular Framework Object
 var MongoConnection = klass({
@@ -62,8 +56,12 @@ var MongoConnection = klass({
 
   initialize: function (connectionSettings) {
 
-    // Set self to this class
-    self = this;
+    // @public {object:Mongoose} Used for mongoDB object relation mapping
+    this.Mongoose = require('mongoose');
+
+    // Set Mongoose debug mode
+    if(TA.mode == 'debug') this.Mongoose.set('debug', true);
+    else this.Mongoose.set('debug', false);
 
     // @public {object} DB connection settings
     this.connectionSettings = connectionSettings;
@@ -78,11 +76,8 @@ var MongoConnection = klass({
   connect: function (cb) {
 
     // Makes the Mongoose database connection
-    Mongoose.connect('mongodb://' + this.connectionSettings.host + '/' +
+    this.db = this.Mongoose.createConnection('mongodb://' + this.connectionSettings.host + '/' +
       this.connectionSettings.database + '');
-
-    // Assign pending connection
-    this.db = Mongoose.connection;
 
     // Respond on database connection
     this.db.on('error', this.onDBError);

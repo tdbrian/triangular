@@ -35,6 +35,7 @@ DEALINGS IN THE SOFTWARE.
 
 var KOA = require('koa');
 var BodyParser = require('koa-body-parser');
+var FS = require('fs');
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR HOOKS
@@ -79,8 +80,28 @@ module.exports = {
 
     triangularBase.listen(app.port);
 
+    // Get Artwork
+    var art = FS.readFileSync(process.cwd() + '/node_modules/triangular/config/triangularArt.txt',
+      'utf8');
+
+    // Get Version
+    var triangularVersion = require('./../package.json').version;
+    var VERSION_NAME = 'Sullust';
+
+    // Framework Details
+    console.log(art.yellow.bold);
+    console.log("Fully Operational Vertical Stack Framework Featuring KOA, MongoDB & AngularJS"
+      .yellow.bold, ' (v'.yellow.bold + triangularVersion.yellow.bold,
+      VERSION_NAME.yellow.bold + ')'.yellow.bold);
+    console.log('c2014 Authors: Thomas Brian & Brenton Gillis'.grey);
+    console.log('REPO: https://github.com/tdbrian/triangular'.grey);
+    console.log('Released Under MIT Open Source License'.grey);
+    console.log('');
+
     console.info( app.name.green + ' Running ON'.green + ' http://localhost:'.yellow +
       String(app.port).yellow);
+
+    console.log('');
 
     // Pass back the triangular application from the run method
     return {

@@ -99,6 +99,9 @@ var TriangularFramework = klass({
 
     });
 
+    // Listens for process to exit and cleans up framework before shutting down
+    this._listenFramworkClose();
+
   },
 
   // --------------------------------------------------------------------------------
@@ -161,6 +164,64 @@ var TriangularFramework = klass({
     // Return false if app not found, else return the app
     if(app) return app;
     else return false;
+
+  },
+
+  // --------------------------------------------------------------------------------
+  // Listens for application to close naturally on by error and closes open DB
+  // connections.
+  // @return {void}
+  // --------------------------------------------------------------------------------
+
+  _listenFramworkClose: function () {
+
+    // --------------------------------------------------------------------------------
+    // Close Database Connections on exiting application
+    // @return {void}
+    // --------------------------------------------------------------------------------
+
+    function closeDBConnections() {
+      // Close DB connections
+      TA._.each(TA.connections, function (dbConnection) {
+        dbConnection.connection.Mongoose.disconnect(function() {
+          TA.logger.info(dbConnection.name.bold + ' database connection closed...');
+        })
+      })
+    }
+
+    // --------------------------------------------------------------------------------
+    // Gracefully exits application
+    // @return {void}
+    // --------------------------------------------------------------------------------
+
+    function gracefulExit() {
+
+      // Close open DB connections
+      closeDBConnections();
+
+      // Let user know it was a graceful exit
+      TA.logger.info('Received Exit Signal, Closing Triangular Framework');
+
+      // Actually exit..
+      process.exit(1);
+
+    };
+
+    // On uncaught exception problem
+    process.on('uncaughtException', function (err) {
+
+      // Display error
+      TA.logger.error('Caught exception: ' + err);
+
+      // Close open DB connections
+      closeDBConnections();
+
+      process.exit(0);
+
+    });
+
+    // On called gracefully exit framework
+    process.on('SIGINT', gracefulExit).on('SIGTERM', gracefulExit);
 
   }
 

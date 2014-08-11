@@ -1,6 +1,6 @@
 {
   "name": "triangular",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "description": "TriangularJS is a full stack application framworking inucluding database (MonogDB), server (Koa), api, and front-end (AngularJS) all tied together with generators and model based API.",
   "main": "triangularFramework.js",
   "scripts": {
