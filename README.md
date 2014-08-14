@@ -3,11 +3,13 @@ Triangular
 
 ### v 0.1.1 Alpha (Sullust)
 
----
-
 #### A Fully Operational Vertical Stack Framework Featuring KOA, MongoDB & AngularJS
 
----
+## Installation
+
+```sh
+npm install triangular -g
+```
 
 ## Whats It About?
 
@@ -46,13 +48,6 @@ Triangular uses a number of open source projects to work properly:
 * [AngularJS] - Client Side Javascript Framework
 * [Twitter Bootstrap] - Making the Front End Look Nice
 
-
-Installation
---------------
-
-```sh
-npm install triangular -g
-```
 
 License
 ----
