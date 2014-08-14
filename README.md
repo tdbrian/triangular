@@ -1,9 +1,10 @@
-Triangular
-=========
+# Triangular
 
 ### v 0.1.1 Alpha (Sullust)
 
-#### A Fully Operational Vertical Stack Framework Featuring KOA, MongoDB & AngularJS
+---
+
+##### A Fully Operational Vertical Stack Framework Featuring KOA, MongoDB & AngularJS
 
 ## Installation
 
@@ -25,18 +26,12 @@ npm install triangular -g
   - Automated Application Build Process
   - You Just Worry About Your Application Logic
   - Magic
----
 
 Before you get started with Triangular, you should be willing to accept the fact that we picked what we believe are the best libraries and tools to get you up and going very quicky. We designed and built Triangular around a delivering a single path to developing your application quickly and with the most features - not options.
 
----
-
 > Now, witness the power of this fully operational node framework.
 
----
-
 Tech
------------
 
 Triangular uses a number of open source projects to work properly:
 
