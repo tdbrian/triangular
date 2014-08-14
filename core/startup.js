@@ -41,8 +41,11 @@ var FS = require('fs');
 // TRIANGULAR HOOKS
 // -------------------------------------------------------------------------------------------------
 
-// @private {object:TriangularRouter} The application automated routing
+// @private {object:Router} The application automated routing
 var TriangularRouter = require('../hooks/routing/router');
+
+// @private {object:ModelBuilder} The application automated model generator
+var TriangularModelBuilder = require('../hooks/models/modelBuilder');
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR SETUP
@@ -73,6 +76,19 @@ module.exports = {
 
     // Sets up automated routing via configuration and controllers
     appRouter.setupControllerRouting();
+
+    // -------------------------------------------------------------------------------------------------
+    // TRIANGULAR MODELS SETUP
+    // -------------------------------------------------------------------------------------------------
+
+    // Create model builder
+    var modelBuilder = new TriangularModelBuilder();
+
+    // Add Shared Models
+    modelBuilder.setupShared();
+
+    // Add Server Models
+    modelBuilder.setupServer();
 
     // -------------------------------------------------------------------------------------------------
     // TRIANGULAR STARTUP
