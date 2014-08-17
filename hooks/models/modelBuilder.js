@@ -39,6 +39,9 @@ DEALINGS IN THE SOFTWARE.
 // @private {object} Utility for file systems calls
 var FS = require("fs");
 
+// @private {object} Utility thunking (like promises for koa)
+var thunkify = require("thunkify");
+
 // @private {object} Handles creating classes in Triangular
 var klass = require('klass');
 
@@ -59,21 +62,8 @@ var ModelBuilder = klass({
 
   initialize: function () {
 
-  },
-
-  // -------------------------------------------------------------------------------------------------
-  // Sets up all models from the public models configuration space. These models
-  // will be available from both server and client side.
-  // -------------------------------------------------------------------------------------------------
-
-  setupShared: function () {
-
-    // Load Public Config Files
-    var publicModelsDirectory = TA.Path.join(process.cwd(), 'public', 'models');
-
-    this.createModelsFromDirectory(publicModelsDirectory, function() {
-
-    });
+    // Contains all of the framework models
+    this.models = {};
 
   },
 
@@ -82,12 +72,22 @@ var ModelBuilder = klass({
   // will be available client side.
   // -------------------------------------------------------------------------------------------------
 
-  setupServer: function () {
+  configSetup: function () {
 
-    // Load Public Config Files
-    var serverModelsDirectory = TA.Path.join(process.cwd(), 'api', 'models');
+    var self = this;
 
-    this.createModelsFromDirectory(serverModelsDirectory, function() {
+    return TA.Q.Promise(function (resolve, reject, notify) {
+
+      // Load Public Config Files
+      var serverModelsDirectory = TA.Path.join(process.cwd(), 'api', 'models');
+
+      // Creates a model for each file in directory
+      self.createModelsFromDirectory(serverModelsDirectory, function(err) {
+
+        if(err) reject(err);
+        else resolve(self.models);
+
+      });
 
     });
 
@@ -102,34 +102,160 @@ var ModelBuilder = klass({
 
   createModelsFromDirectory: function (modelsDirectory, modelsCreatedCallback) {
 
-    // Get each model data
-    FS.readdirSync(modelsDirectory).forEach(function(modelFile) {
+    var self = this;
 
-      // Get file's model data
-      TA.logger.info(modelsDirectory + '/' + modelFile)
-      var modelData = require(modelsDirectory + '/' + modelFile);
+    // Try to read directory file passed
+    try {
+      var modelFiles = FS.readdirSync(modelsDirectory);
+    } catch (err) {
+      modelsCreatedCallback(err);
+    }
+
+    // Async loops through each file in models directory and creates a model for each
+    TA.Async.each(modelFiles, function (modelFile, modelCreatedCallback) {
+
+      // Try to get file's model data
+      try {
+        var modelData = require(modelsDirectory + '/' + modelFile);
+      } catch (err) {
+        modelCreatedCallback(err);
+      }
 
       // Strip model file extension
       var modelName = modelFile.substr(0, modelFile.lastIndexOf('.')) || modelFile;
 
-      // Loop through each property and add to model
-      TA._.forIn(modelData, function (attributes, property) {
+      self.createModel(modelName, modelData);
 
-        TA.logger.info(property);
+      modelCreatedCallback();
 
-      });
-      // END OF DATA MODEL LOOP
+    }, function (err) {
+
+      if(err) modelsCreatedCallback(err);
+      else modelsCreatedCallback();
+
+    }); // END OF FILES ASYNC
+
+  },
+
+  // --------------------------------------------------------------------------------
+  // Creates a model based on name and model configuration
+  // @param {string} Name of the new model
+  // @param {object} Model configuration data
+  // @return {object:Model} The final built model
+  // --------------------------------------------------------------------------------
+
+  createModel: function (modelName, modelData) {
+
+    var self = this;
+
+    // Get specified model (from model meta)
+    try {
+      var dbConnection = TA.framework.getDBConnection(modelData._meta.db);
+    } catch (err) {
+      throw new Error('Cannot add model ' + modelName + ' to a non-existent database');
+    }
+
+    var modelSchemaObject = {};
+
+    // Loop through each property and add to model
+    TA._.forIn(modelData, function (attributes, property) {
+
+      // Create the property schema object
+      modelSchemaObject[property] = {};
+
+      // Sets schema type & normalizes if necessary
+      if (attributes.type && attributes.type != 'ID' && attributes.type != '_meta') {
+        modelSchemaObject[property].type = self.normalizeModelTypes(attributes.type);
+      } else {
+        modelSchemaObject[property].type = 'String';
+      }
+
+      // If required... set
+      if(attributes.required) {
+        modelSchemaObject[property].required = true;
+      }
 
     });
-    // END OF FILE READ
+    // END OF DATA MODEL LOOP
+
+    // TA.logger.info('schema...');
+    // TA.logger.info(modelSchemaObject);
+
+    // Create a schema based on configuration
+    var schema = new Mongoose.Schema(modelSchemaObject);
+
+    // ADD ADDITIONAL METHODS TO MONGOOSE SCHEMA
+
+    // Add persist function (alias for save with promise)
+    schema.method('persist', thunkify(function(){
+      return this.save.apply(this, arguments);
+    }));
+
+    // Create model and add to globals
+    var newModel = dbConnection.connection.db.model(modelName, schema);
+    this.models[modelName] = newModel;
+
+  },
+
+  // --------------------------------------------------------------------------------
+  // Takes a Triangular model type and converts it to a mongoose type
+  // @param {string} Triangular Type
+  // @return {string} Mongoose Type
+  // --------------------------------------------------------------------------------
+
+  normalizeModelTypes: function (type) {
+    var originalType = type;
+    type = type.toLowerCase()
+
+    // Valid mongoose types
+    var MONGOOSE_TYPES = [
+      'string',
+      'number',
+      'date',
+      'buffer',
+      'boolean',
+      'mixed',
+      'ojectid',
+      'array'
+    ];
+
+    // Valid string types
+    var STRING_TYPES = [
+      'string',
+      'select',
+      'password',
+      'email',
+      'ssn',
+      'phone',
+      'zip'
+    ];
+
+    // Check if id type
+    if(type == 'id') type = 'ojectid';
+
+    // Check if string type
+    if(TA._.contains(STRING_TYPES, type)) type = 'string';
+
+    // Switch list to array
+    if(type == 'list') type = 'Array';
+
+    if (TA._.contains(MONGOOSE_TYPES, type)) {
+      return type;
+    } else {
+      throw new Error(originalType + " " + type + " is an invalid model type");
+    };
 
   }
 
 });
+
 
 // -------------------------------------------------------------------------------------------------
 // NODE MODULE EXPORT
 // -------------------------------------------------------------------------------------------------
 
 module.exports = ModelBuilder;
+
+
+
 

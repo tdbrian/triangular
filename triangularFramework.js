@@ -38,6 +38,9 @@ DEALINGS IN THE SOFTWARE.
 // @private {object} Handles creating classes in Triangular
 var klass = require('klass');
 
+// @private {object} Promise Utility
+var Q = require('q');
+
 // @private {object} Handles setting up and managing Triangular global namespace (TA)
 var globalsManager = require('./core/globals');
 
@@ -64,43 +67,53 @@ var TriangularFramework = klass({
 
   initialize: function () {
 
-    // Set self to this class
-    _self = this;
+    self = this;
 
-    // Setup triangular framework globals
-    globalsManager.setupDefault();
+    Q.spawn(function* () {
 
-    // @global {array} Stores all of the framework applications
-    TA.apps = [];
+      // Setup triangular framework globals
+      globalsManager.setupDefault();
 
-    // @global {array} Stores all of the framework database connections
-    TA.connections = [];
+      // Add framework to global
+      TA.framework = self;
 
-    // Setup app(s) based on project apps configuration file
-    var projectConfig = require(TA.appConfig + 'project').project;
+      // Add Q Promise Utility to TA global space
+      TA.Q = Q;
 
-    // @global {string} The project name
-    TA.name = projectConfig.name;
+      // @global {array} Stores all of the framework applications
+      TA.apps = [];
 
-    // @global {string} The project name
-    TA.mode = projectConfig.mode;
+      // Setup app(s) based on project apps configuration file
+      var projectConfig = require(TA.appConfig + 'project').project;
 
-    // Setup app(s) based on project apps configuration file
-    var appsConfig = require(TA.appConfig + 'apps').apps;
+      // @global {string} The project name
+      TA.name = projectConfig.name;
 
-    // Connect project databases
-    this.connectDatabases();
+      // @global {string} The project name
+      TA.mode = projectConfig.mode;
 
-    // Setup each triangular app
-    TA._.each(appsConfig, function (appConfig) {
+      // If Debugging, set Q stack support on
+      if(TA.mode == 'debug') Q.longStackSupport = true;
 
-      // Add new application based on passed app configuration
-      _self.addApp(appConfig);
+      // Setup app(s) based on project apps configuration file
+      var appsConfig = require(TA.appConfig + 'apps').apps;
+
+      // Connect project databases
+      // @global {array} Stores all of the framework database connections
+      TA.connections = yield self.connectDatabases();
+
+      // Setup each triangular app
+      TA._.each(appsConfig, function (appConfig) {
+
+        // Add new application based on passed app configuration
+        self.addApp(appConfig);
+
+      });
+
+      // Listens for process to exit and cleans up framework before shutting down
+      self._listenFramworkClose();
 
     });
-
-    // Listens for process to exit and cleans up framework before shutting down
-    this._listenFramworkClose();
 
   },
 
@@ -112,30 +125,62 @@ var TriangularFramework = klass({
 
   connectDatabases: function () {
 
-    // Setup app(s) based on project apps configuration file
-    var dbsConfig = require(TA.appConfig + 'databases');
+    // Stores the connections to be returned
+    var connections = [];
 
-    // Setup each database
-    TA._.each(dbsConfig, function (databaseConfig) {
+    return Q.Promise(function(resolve, reject, notify) {
 
-      // Initiated Database
-      var db;
+      // Setup app(s) based on project apps configuration file
+      var dbsConfig = require(TA.appConfig + 'databases');
 
-      // Select DB based on config type
-      switch(databaseConfig.type) {
-        case 'mongoDB':
-          var db = new MongoDatabase(databaseConfig);
-          break;
-      }
+      // Setup each database
+      TA.Async.each(dbsConfig, function (databaseConfig, dbOpenCallback) {
 
-      // If database is set to active, connect and add to global
-      if (db.active) {
-        db.connect(function() {
-          TA.connections.push(db);
-        });
-      };
+        // Initiated Database
+        var db;
+
+        // Select DB based on config type
+        switch(databaseConfig.type) {
+          case 'mongoDB':
+            var db = new MongoDatabase(databaseConfig);
+            break;
+        }
+
+        // If database is set to active, connect and add to global
+        if (db.active) {
+          db.connect(function() {
+            connections.push(db);
+            dbOpenCallback();
+          });
+        };
+
+      }, function (err) {
+        if(err) reject(new Error("Problem making database connections"));
+        else resolve(connections);
+      });
 
     });
+    // ON PROMISE RETURN
+
+  },
+
+  // --------------------------------------------------------------------------------
+  // Gets a framework database connection for performing operations on
+  // @param {string} The name of the connection to get
+  // @return {oject:Connection} Connection
+  // --------------------------------------------------------------------------------
+
+  getDBConnection: function (name) {
+
+    // Find the connection from open connections
+    var dbConnection = TA._.find(TA.connections, { name: name });
+
+    // Make sure a connection was found by that name.. else throw error
+    if(dbConnection) {
+      return dbConnection;
+    } else {
+      throw new Error("Database Connection " + name + " does not exist");
+    }
 
   },
 
@@ -212,6 +257,7 @@ var TriangularFramework = klass({
 
       // Display error
       TA.logger.error('Caught exception: ' + err);
+      console.error(err);
 
       // Close open DB connections
       closeDBConnections();

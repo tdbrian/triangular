@@ -34,15 +34,24 @@ DEALINGS IN THE SOFTWARE.
 // -------------------------------------------------------------------------------------------------
 
 var KOA = require('koa');
-var BodyParser = require('koa-body-parser');
 var FS = require('fs');
+
+// -------------------------------------------------------------------------------------------------
+// TRIANGULAR MIDDLEWARE PACKAGES
+// -------------------------------------------------------------------------------------------------
+
+var KOABodyParser = require('koa-body-parser');
+var KOAJson = require('koa-json');
+var TriangularViews = require('./../hooks/views/views');
+var TriangularViewsPathParser = require('./../hooks/views/viewPathParser');
+var TriangularControllerAutoDiscoverer = require('./../core/controllers/controllersBuilder');
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR HOOKS
 // -------------------------------------------------------------------------------------------------
 
 // @private {object:Router} The application automated routing
-var TriangularRouter = require('../hooks/routing/router');
+var TriangularRouteBuilder = require('../hooks/routing/routeBuilder');
 
 // @private {object:ModelBuilder} The application automated model generator
 var TriangularModelBuilder = require('../hooks/models/modelBuilder');
@@ -53,80 +62,111 @@ var TriangularModelBuilder = require('../hooks/models/modelBuilder');
 
 module.exports = {
 
-  start: function (app) {
+  start: function (app, cb) {
 
-    // -------------------------------------------------------------------------------------------------
-    // PREP TRIANGULAR
-    // -------------------------------------------------------------------------------------------------
+    TA.Q.spawn(function* () {
 
-    var triangularBase = KOA();
+      // -------------------------------------------------------------------------------------------------
+      // PREP TRIANGULAR
+      // -------------------------------------------------------------------------------------------------
 
-    // -------------------------------------------------------------------------------------------------
-    // ADD BODY PARSING
-    // -------------------------------------------------------------------------------------------------
+      var triangularBase = KOA();
 
-    triangularBase.use(BodyParser());
+      // Add Triangular App to ctx
+      triangularBase.use(function* (next) {
+        this.triangularApp = app;
+        yield next;
+      });
 
-    // -------------------------------------------------------------------------------------------------
-    // TRIANGULAR ROUTING HOOK SETUP
-    // -------------------------------------------------------------------------------------------------
+      // -------------------------------------------------------------------------------------------------
+      // ADD BODY PARSING
+      // -------------------------------------------------------------------------------------------------
 
-    // Create App Router
-    var appRouter = new TriangularRouter(triangularBase);
+      triangularBase.use(KOABodyParser());
 
-    // Sets up automated routing via configuration and controllers
-    appRouter.setupControllerRouting();
+      // -------------------------------------------------------------------------------------------------
+      // ADD BODY JSON OUTPUT
+      // -------------------------------------------------------------------------------------------------
 
-    // -------------------------------------------------------------------------------------------------
-    // TRIANGULAR MODELS SETUP
-    // -------------------------------------------------------------------------------------------------
+      triangularBase.use(KOAJson());
 
-    // Create model builder
-    var modelBuilder = new TriangularModelBuilder();
+      // -------------------------------------------------------------------------------------------------
+      // TRIANGULAR CONTROLLERS & ACTIONS AUTO DISCOVER
+      // -------------------------------------------------------------------------------------------------
 
-    // Add Shared Models
-    modelBuilder.setupShared();
+      var controllerActions = TriangularControllerAutoDiscoverer();
 
-    // Add Server Models
-    modelBuilder.setupServer();
+      // -------------------------------------------------------------------------------------------------
+      // TRIANGULAR MODELS SETUP
+      // -------------------------------------------------------------------------------------------------
 
-    // -------------------------------------------------------------------------------------------------
-    // TRIANGULAR STARTUP
-    // -------------------------------------------------------------------------------------------------
+      // Create model builder
+      var modelBuilder = new TriangularModelBuilder();
 
-    triangularBase.listen(app.port);
+      // Add Shared Models
+      TA.models = yield modelBuilder.configSetup();
 
-    // Get Artwork
-    var art = FS.readFileSync(process.cwd() + '/node_modules/triangular/config/triangularArt.txt',
-      'utf8');
+      // -------------------------------------------------------------------------------------------------
+      // ADD VIEWS
+      // -------------------------------------------------------------------------------------------------
 
-    // Get Version
-    var triangularVersion = require('./../package.json').version;
-    var VERSION_NAME = 'Sullust';
+      // Determines View Path
+      triangularBase.use(TriangularViewsPathParser);
 
-    // Framework Details
-    console.log(art.yellow.bold);
-    console.log("Fully Operational Vertical Stack Framework Featuring KOA, MongoDB & AngularJS"
-      .yellow.bold, ' (v'.yellow.bold + triangularVersion.yellow.bold,
-      VERSION_NAME.yellow.bold + ')'.yellow.bold);
-    console.log('c2014 Authors: Thomas Brian & Brenton Gillis'.grey);
-    console.log('REPO: https://github.com/tdbrian/triangular'.grey);
-    console.log('Released Under MIT Open Source License'.grey);
-    console.log('');
+      // Sets up triangular views & templates
+      triangularBase.use(TriangularViews('views', {
+        default: app.viewEngine,
+        cache: app.cacheViews
+      }));
 
-    console.info( app.name.green + ' Running ON'.green + ' http://localhost:'.yellow +
-      String(app.port).yellow);
+      // -------------------------------------------------------------------------------------------------
+      // TRIANGULAR ROUTING HOOK SETUP
+      // -------------------------------------------------------------------------------------------------
 
-    console.log('');
+      // Create App Router
+      var appRouteBuilder = new TriangularRouteBuilder(triangularBase);
 
-    // Pass back the triangular application from the run method
-    return {
-      base: triangularBase,
-      router: appRouter
-    };
+      // Sets up automated routing via configuration and controllers
+      appRouteBuilder.setupControllerRouting();
 
-  }
+      // -------------------------------------------------------------------------------------------------
+      // TRIANGULAR STARTUP
+      // -------------------------------------------------------------------------------------------------
 
-}
+      triangularBase.listen(app.port);
+
+      // Get Artwork
+      var art = FS.readFileSync(process.cwd() + '/node_modules/triangular/config/triangularArt.txt',
+        'utf8');
+
+      // Get Version
+      var triangularVersion = require('./../package.json').version;
+      var VERSION_NAME = 'Sullust';
+
+      // Framework Details
+      console.info(art.yellow.bold);
+      console.info("Fully Operational Vertical Stack Framework Utilizing KOA, MongoDB & AngularJS"
+        .yellow.bold, ' (v'.yellow.bold + triangularVersion.yellow.bold,
+        VERSION_NAME.yellow.bold + ')'.yellow.bold);
+      console.info('c2014 Authors: Thomas Brian <github.com/tdbrian> & Brenton Gillis <github.com/brentongillis>'.grey);
+      console.info('REPO: https://github.com/tdbrian/triangular'.grey);
+      console.info('Released Under MIT Open Source License'.grey);
+      console.info('');
+
+      console.info( app.name.green + ' Running ON'.green + ' http://localhost:'.yellow +
+        String(app.port).yellow);
+
+      // Pass back the triangular application from the run method
+      cb({
+        base: triangularBase,
+        router: appRouteBuilder,
+        controllerActions: controllerActions
+      });
+
+    }); // START PROMISE
+
+  } // START
+
+} // EXPORTS
 
 

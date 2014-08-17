@@ -53,8 +53,20 @@ var Triangular = Klass({
     // @public {number} Application port
     this.port = appConfig.port;
 
+    // @public {string} Application templating engine
+    this.viewEngine = appConfig.viewEngine;
+
+    // @public {string} Application templating engine caching
+    this.cacheViews = appConfig.cacheViews;
+
     // @public {object} The underlying base application
     this.base = {};
+
+    // @public {object} App router
+    this.router = {};
+
+    // @public {object} Controller Actions
+    this.controllerActions = {};
 
     // Runs startup on the app
     this.setup();
@@ -72,10 +84,14 @@ var Triangular = Klass({
     // TRIANGULAR STARTUP
     // -------------------------------------------------------------------------------------------------
 
+    var self = this;
+
     // Startup triangular and get the startup parts
-    var triangularParts = require('./startup.js').start(this);
-    this.base = triangularParts.base;
-    // this.router = triangularParts.router;
+    require('./startup.js').start(this, function (triangularParts) {
+      self.base = triangularParts.base;
+      self.router = triangularParts.appRouter;
+      self.controllerActions = triangularParts.controllerActions;
+    });
 
   }
 

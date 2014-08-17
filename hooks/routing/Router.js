@@ -1,219 +1,305 @@
 /**
-* @fileoverview Handles all triagnular routing and automated routing.
-* application.
-*
-* @author <tdbrian@gmail.com> (Thomas Brian)
-* @version 0.0.1 2014-08-06 <tdbrian@gmail.com> (Thomas Brian)
+ * Dependencies
+ */
 
-MIT License
-===========
+var methods = require('methods')
+  , parse = require('url').parse
+  , Route = require('./route');
 
-Copyright (c) 2014 Thomas Brian <tdbrian@gmail.com>
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-**/
-
-// -------------------------------------------------------------------------------------------------
-// TRIANGULAR ROUTER REQUIREMENTS
-// -------------------------------------------------------------------------------------------------
-
-// @private {object} Utility for file systems calls
-var FS = require("fs");
-
-// @private {object} Utility for Classes
-var Klass = require('klass');
-
-// @private {object:KOARouter} Bassis of application routing
-var KOARouter = require('koa-router');
-
-// @private {object:ResourceRouter} Basis for API routing resources
-var Resource = require('koa-resource-router');
-
-// @private {object:StaticServer} Handles serving static files
-var StaticServer = require('koa-static');
-
-// @private {object:KOAMount} Used for mounting routes on the middleware
-var Mount = require('koa-mount');
-
-// @private {object:Path} Used for forming up file paths
-var Path = require('path');
-
-var self;
-
-// -------------------------------------------------------------------------------------------------
-// The router class.
-// @param {object} The triangular application to attach the routing to.
-// @return {void}
-// -------------------------------------------------------------------------------------------------
-
-var Router = Klass({
-
-  // @public {object:RoutesCollection} API versioning Routes indexed by name
-  routeAPIVersions: {},
-
-  // @public {object:Strings} All automatically loaded controllers & routing
-  loadedControllers: {},
-
-  initialize: function (triangular) {
-
-    self = this;
-
-    // @public {object:Triangular} // The triangular application to add the routing to
-    this.triangularAPP = triangular;
-
-    // @public {object:Strings} All setup application routes
-    this.triangularAPP.routes = {};
-
-    // Attach router to triangular app
-    triangular.use(KOARouter(triangular));
-
-  },
-
-  // -------------------------------------------------------------------------------------------------
-  // Adds automated controller routing to the application
-  // @param {}
-  // @return {void}
-  // -------------------------------------------------------------------------------------------------
-
-  setupControllerRouting: function() {
-
-    var controllersDirectory = Path.join(process.cwd(), 'api', 'controllers');
-
-    FS.readdirSync(controllersDirectory).forEach(function(file) {
-
-      // Get controller and added to loaded controllers
-      var controller = require(Path.join(process.cwd(), "api", "controllers", file));
-
-      // Strip controller extension
-      var controllerName = file.substr(0, file.lastIndexOf('.')) || file;
-
-      // Add to loaded controllers for access later
-      self.loadedControllers[controllerName] = controller;
-
-      // Create a route for each controller
-      TA._.forEach(controller, function (controllerFunctions, fnName) {
-
-        var verb;           // The function verb
-        var name;           // The function name
-        var path;           // The path to the function route
-
-        // Check if function name includes verb
-        if (fnName.indexOf('_') > -1) {
-          var fnParts = fnName.split('_');
-          verb = fnParts[0].toLowerCase();
-          name = fnParts[1].toLowerCase();
-        } else {
-          // console.log('setting default get...');
-          verb = 'get';
-          name = fnName;
-        }
-
-        // Create route path
-        var modControllerName = controllerName.replace('Controller', '').toLowerCase();
-        var path = '/' + modControllerName + '/' + name;
-
-        // Create route
-        try {
-          self.triangularAPP[verb](path, controller[fnName]);
-        } catch (err) {
-          console.log(err);
-          throw new Error('Route function ' + name + ' setup error.');
-        }
-
-      })
-
-    });
-
-    // Setup app(s) based on project apps configuration file
-    var routesConfig = require(TA.appConfig + 'router');
-
-    // Add each route from config routes
-    TA._.forEach(routesConfig, function (routePair, path) {
-
-      var pathParts;                    // The parts of the path from the route config 'post /hello'
-      var verb;                         // The route config verb (get, post, put, remove)
-      var path;                         // The URL path '/hello'
-      var definedVerb = false           // Specifies if route verb was defined
-
-      // If a space in the path, the first part is expected to be the route verb
-      if (path.indexOf(' ') > -1) {
-        pathParts = path.split(' ');
-        verb = pathParts[0];
-        path = pathParts[1];
-        definedVerb = true;
-
-      // Default no verb to a get
-      } else {
-        verb = 'get';
-      }
-
-      // Expecting route pair to contain a '.' to split the controller and function
-      // Notify if not the correct format for routing
-      if (routePair.indexOf('.') > -1) {
-
-        // Get controller combo parts (controller and function names)
-        var controllerCombo = routePair.split('.');
-
-        // Available controller functions
-        var availableFn = TA._.keys(self.loadedControllers[controllerCombo[0]])
-        var fnName;
-
-        // Check if there is a controller function with same verb
-        if (verb == 'get' && TA._.contains(availableFn, 'get_' + controllerCombo[1])) {
-          fnName = 'get_' + controllerCombo[1];
-
-        // If the verb was defined, only us a function with ver defined
-        } else if (definedVerb && TA._.contains(['post', 'put', 'delete'], verb)) {
-          fnName = verb + '_' + controllerCombo[1]
-
-        // If verb not defined.. and no matching 'get_' then set to original name
-        } else {
-          fnName = controllerCombo[1];
-        }
-
-        var routeFunction = self.loadedControllers[controllerCombo[0]][fnName];
-
-      } else {
-        throw new Error('Controller for route ' + path + ' in router.js is incorrect format');
-      }
-
-      // Attempt to setup route
-      try {
-        self.triangularAPP[verb](path, routeFunction);
-        // routePaths.push()
-      } catch (err) {
-        console.log(err);
-        throw new Error('Controller and function for ' + verb + ' route "' + path + '" in router.js ' +
-          'does not exist');
-      }
-
-    });
-
-  }
-
-});
-
-// -------------------------------------------------------------------------------------------------
-// MODULE EXPORT
-// -------------------------------------------------------------------------------------------------
+/**
+ * Expose `Router`
+ */
 
 module.exports = Router;
 
+/**
+ * Initialize Router.
+ *
+ * @param {Application} app Optional. Extends app with methods such
+ * as `app.get()`, `app.post()`, etc.
+ * @return {Router}
+ * @api public
+ */
 
+function Router(app) {
+  if (!(this instanceof Router)) {
+    var router = new Router(app);
+    return router.middleware();
+  }
+
+  this.methods = ['OPTIONS'];
+  this.routes = [];
+
+  // extend application
+  if (app) this.extendApp(app);
+};
+
+/**
+ * Router prototype
+ */
+
+var router = Router.prototype;
+
+/**
+ * Router middleware factory. Returns router middleware which dispatches route
+ * middleware corresponding to the request.
+ *
+ * @param {Function} next
+ * @return {Function}
+ * @api public
+ */
+
+router.middleware = function() {
+  var router = this;
+
+  return function *dispatch(next) {
+    var matchedRoutes;
+
+    // Parameters for this route
+    if (!(this.params instanceof Array)) {
+      this.params = [];
+    }
+
+    // Find routes matching requested path
+    if (matchedRoutes = router.match(this.path)) {
+      var methodsAvailable = {};
+
+      // Find matched route for requested method
+      for (var len = matchedRoutes.length, i=0; i<len; i++) {
+        var route = matchedRoutes[i].route;
+        var params = matchedRoutes[i].params;
+
+        for (var l = route.methods.length, n=0; n<l; n++) {
+          var method = route.methods[n];
+
+          methodsAvailable[method] = true;
+
+          // if method and path match, dispatch route middleware
+          if (method === this.method) {
+            this.route = route;
+
+            // Merge the matching routes params into context params
+            merge(this.params, params);
+
+            return yield route.middleware.call(this, next);
+          }
+        }
+      }
+
+      // matches path but not method, so return 405 Method Not Allowed
+      // unless this is an OPTIONS request.
+      this.status = (this.method === 'OPTIONS' ? 204 : 405);
+      this.set('Allow', Object.keys(methodsAvailable).join(", "));
+    }
+    else {
+      // Could not find any route matching the requested path
+      // simply yield to downstream koa middleware
+      return yield next;
+    }
+
+    // a route matched the path but not method.
+    // currently status is prepared as 204 or 405
+    // If the method is in fact unknown at the router level,
+    // send 501 Not Implemented
+    if (!~router.methods.indexOf(this.method)) {
+      this.status = 501;
+    }
+  };
+};
+
+/**
+ * Create `router.verb()` methods, where *verb* is one of the HTTP verbes such
+ * as `router.get()` or `router.post()`.
+ */
+
+methods.forEach(function(method) {
+  router[method] = function(name, path, middleware) {
+    var args = Array.prototype.slice.call(arguments);
+    if ((typeof path === 'string') || (path instanceof RegExp)) {
+      args.splice(2, 0, [method]);
+    } else {
+      args.splice(1, 0, [method]);
+    }
+    this.register.apply(this, args);
+    return this;
+  };
+});
+
+// Alias for `router.delete()` because delete is a reserved word
+router.del = router['delete'];
+
+/**
+ * Register route with all methods.
+ *
+ * @param {String} name Optional.
+ * @param {String|RegExp} path
+ * @param {Function} middleware You may also pass multiple middleware.
+ * @return {Route}
+ * @api public
+ */
+
+router.all = function(name, path, middleware) {
+  var args = Array.prototype.slice.call(arguments);
+  args.splice(typeof path == 'function' ? 1 : 2, 0, methods);
+
+  return this.register.apply(this, args);
+};
+
+/**
+ * Redirect `path` to `destination` URL with optional 30x status `code`.
+ *
+ * @param {String} source URL, RegExp, or route name.
+ * @param {String} destination URL or route name.
+ * @param {Number} code HTTP status code (default: 301).
+ * @return {Route}
+ * @api public
+ */
+
+router.redirect = function(source, destination, code) {
+  // lookup source route by name
+  if (source instanceof RegExp || source[0] != '/') {
+    source = this.url(source);
+  }
+
+  // lookup destination route by name
+  if (destination instanceof RegExp || destination[0] != '/') {
+    destination = this.url(destination);
+  }
+
+  return this.all(source, function *() {
+    this.redirect(destination);
+    this.status = code || 301;
+  });
+};
+
+/**
+ * Create and register a route.
+ *
+ * @param {String} name Optional.
+ * @param {String|RegExp} path Path string or regular expression.
+ * @param {Array} methods Array of HTTP verbs.
+ * @param {Function} middleware Multiple middleware also accepted.
+ * @return {Route}
+ * @api public
+ */
+
+router.register = function(name, path, methods, middleware) {
+  if (path instanceof Array) {
+    middleware = Array.prototype.slice.call(arguments, 2);
+    methods = path;
+    path = name;
+    name = null;
+  }
+  else {
+    middleware = Array.prototype.slice.call(arguments, 3);
+  }
+
+  // create route
+  var route = new Route(path, methods, middleware, name);
+
+  // register route with router
+  this.routes.push(route);
+
+  // register route methods with router (for 501 responses)
+  route.methods.forEach(function(method) {
+    if (!~this.methods.indexOf(method)) {
+      this.methods.push(method);
+    }
+  }, this);
+
+  return route;
+};
+
+/**
+ * Lookup route with given `name`.
+ *
+ * @param {String} name
+ * @return {Route|false}
+ * @api public
+ */
+
+router.route = function(name) {
+  for (var len = this.routes.length, i=0; i<len; i++) {
+    if (this.routes[i].name == name) {
+      return this.routes[i];
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Generate URL for route using given `params`.
+ *
+ * @param {String} name route name
+ * @param {Object} params url parameters
+ * @return {String|Error}
+ * @api public
+ */
+
+router.url = function(name, params) {
+  var route = this.route(name);
+
+  if (route) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return route.url.apply(route, args);
+  }
+
+  return new Error("No route found for name: " + name);
+};
+
+/**
+ * Match given `path` and return corresponding routes.
+ *
+ * @param {String} path
+ * @param {Array} params populated with captured url parameters
+ * @return {Array|false} Returns matched routes or false.
+ * @api private
+ */
+
+router.match = function(path) {
+  var routes = this.routes;
+  var matchedRoutes = [];
+
+  for (var len = routes.length, i=0; i<len; i++) {
+
+    var params = routes[i].match(path);
+    if (params) {
+      matchedRoutes.push({ route: routes[i], params: params });
+    }
+  }
+
+  return matchedRoutes.length > 0 ? matchedRoutes : false;
+};
+
+/**
+ * Extend given `app` with router methods.
+ *
+ * @param {Application} app
+ * @return {Application}
+ * @api private
+ */
+
+router.extendApp = function(app) {
+  ['all', 'redirect', 'register', 'url', 'del'].concat(methods)
+  .forEach(function(method) {
+    app[method] = Router.prototype[method].bind(this);
+  }, this);
+
+  return app;
+};
+
+/**
+ * Merge b into a.
+ *
+ * @param {Object} a
+ * @param {Object} b
+ * @return {Object} a
+ * @api private
+ */
+
+function merge(a, b) {
+  if (!b) return a;
+  for (var k in b) a[k] = b[k];
+  return a;
+}

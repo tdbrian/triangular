@@ -75,6 +75,8 @@ var MongoConnection = klass({
 
   connect: function (cb) {
 
+    var self = this;
+
     // Makes the Mongoose database connection
     this.db = this.Mongoose.createConnection('mongodb://' + this.connectionSettings.host + '/' +
       this.connectionSettings.database + '');
@@ -84,6 +86,7 @@ var MongoConnection = klass({
 
     // Respond on database connection open
     this.db.on('open', function () {
+      console.log('MongoDB connection made to '.green + self.connectionSettings.database.green.bold);
       cb();
     });
 

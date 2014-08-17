@@ -37,7 +37,10 @@ module.exports.modules = {
   'Colors': 'colors',
 
   // @public {object} Colors for coloring terminal text
-  'Path': 'path'
+  'Path': 'path',
+
+  // @public {object} Async utility
+  'Async': 'async',
 
 }
 

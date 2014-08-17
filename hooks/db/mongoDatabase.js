@@ -84,7 +84,6 @@ var MongoDatabase = klass ({
     this.connection.connect(function() {
       var connectionNotification = name.bold+' Database Connection Made in mode: '+
       TA.mode.underline.yellow;
-      console.log(connectionNotification.green);
       cb();
     })
 
