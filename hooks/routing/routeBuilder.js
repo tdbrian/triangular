@@ -73,6 +73,9 @@ var RouterBuilder = Klass({
 
     var self = this;
 
+    // Serve Static Routes from Public
+    triangular.use(StaticServer(process.cwd() + '/public'));
+
     // @public {object:Triangular} // The triangular application to add the routing to
     this.triangularAPP = triangular;
 

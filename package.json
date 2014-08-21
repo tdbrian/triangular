@@ -1,5 +1,6 @@
 {
   "name": "triangular",
+  "versionName": "Sullust",
   "version": "0.1.1",
   "description": "TriangularJS is a full stack application framworking inucluding database (MonogDB), server (Koa), api, and front-end (AngularJS) all tied together with generators and model based API.",
   "main": "triangularFramework.js",
@@ -37,7 +38,11 @@
     "koa-send": "^1.2.4",
     "koa-compose": "^2.3.0",
     "methods": "^1.1.0",
-    "path-to-regexp": "^0.2.5"
+    "path-to-regexp": "^0.2.5",
+    "prettyjson": "^1.0.0",
+    "koa-passport": "^0.5.1",
+    "passport-local": "^1.0.0",
+    "koa-flash": "0.0.3"
   },
   "keywords": [
     "triangular",

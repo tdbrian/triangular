@@ -50,6 +50,8 @@ var Triangular = require('./core/triangular');
 // @private {object:MongoDatabase} The Triangular MongoDatabase Class handles connection to mongodB
 var MongoDatabase = require('./hooks/db/mongoDatabase');
 
+var prettyjson = require('prettyjson');
+
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR FRAMEWORK CLASS
 // -------------------------------------------------------------------------------------------------
@@ -88,6 +90,7 @@ var TriangularFramework = klass({
 
       // @global {string} The project name
       TA.name = projectConfig.name;
+      process.title = TA.name;
 
       // @global {string} The project name
       TA.mode = projectConfig.mode;
@@ -257,7 +260,7 @@ var TriangularFramework = klass({
 
       // Display error
       TA.logger.error('Caught exception: ' + err);
-      console.error(err);
+      console.log(prettyjson.render(err));
 
       // Close open DB connections
       closeDBConnections();

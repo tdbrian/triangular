@@ -34,17 +34,22 @@ DEALINGS IN THE SOFTWARE.
 // -------------------------------------------------------------------------------------------------
 
 var KOA = require('koa');
-var FS = require('fs');
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR MIDDLEWARE PACKAGES
 // -------------------------------------------------------------------------------------------------
 
-var KOABodyParser = require('koa-body-parser');
+var BodyParser = require('koa-body-parser');
 var KOAJson = require('koa-json');
+var RedisSession = require('koa-session-redis');
+var Auth = require('koa-passport');
+var Flash = require('koa-flash');
+
 var TriangularViews = require('./../hooks/views/views');
 var TriangularViewsPathParser = require('./../hooks/views/viewPathParser');
 var TriangularControllerAutoDiscoverer = require('./../core/controllers/controllersBuilder');
+var TriangularAuthentication = require('./../hooks/authentication/setup');
+var TriangularStartupInfo = require('./utils/printStartupInfo');
 
 // -------------------------------------------------------------------------------------------------
 // TRIANGULAR HOOKS
@@ -82,19 +87,32 @@ module.exports = {
       // ADD BODY PARSING
       // -------------------------------------------------------------------------------------------------
 
-      triangularBase.use(KOABodyParser());
+      triangularBase.use(BodyParser());
+
+      // -------------------------------------------------------------------------------------------------
+      // SETUP REDIS SESSIONS
+      // -------------------------------------------------------------------------------------------------
+
+      // Setup session based on project session configuration file
+      var sessionConfig = require(TA.appConfig + 'session');
+
+      // Set app keys
+      triangularBase.keys = sessionConfig.session.keys;
+
+      // Use redis configuration based on app mode
+      triangularBase.use(RedisSession(sessionConfig.session[TA.mode].store));
+
+      // -------------------------------------------------------------------------------------------------
+      // ADD FLASH
+      // -------------------------------------------------------------------------------------------------
+
+      triangularBase.use(Flash());
 
       // -------------------------------------------------------------------------------------------------
       // ADD BODY JSON OUTPUT
       // -------------------------------------------------------------------------------------------------
 
       triangularBase.use(KOAJson());
-
-      // -------------------------------------------------------------------------------------------------
-      // TRIANGULAR CONTROLLERS & ACTIONS AUTO DISCOVER
-      // -------------------------------------------------------------------------------------------------
-
-      var controllerActions = TriangularControllerAutoDiscoverer();
 
       // -------------------------------------------------------------------------------------------------
       // TRIANGULAR MODELS SETUP
@@ -105,6 +123,21 @@ module.exports = {
 
       // Add Shared Models
       TA.models = yield modelBuilder.configSetup();
+
+      // -------------------------------------------------------------
+      // SETUP PASSPORT AUTHENTICATION
+      // -------------------------------------------------------------
+
+      triangularBase.use(Auth.initialize());
+      triangularBase.use(Auth.session());
+      TriangularAuthentication(Auth);
+      TA.auth = Auth;
+
+      // -------------------------------------------------------------------------------------------------
+      // TRIANGULAR CONTROLLERS & ACTIONS AUTO DISCOVER
+      // -------------------------------------------------------------------------------------------------
+
+      var controllerActions = TriangularControllerAutoDiscoverer();
 
       // -------------------------------------------------------------------------------------------------
       // ADD VIEWS
@@ -135,26 +168,8 @@ module.exports = {
 
       triangularBase.listen(app.port);
 
-      // Get Artwork
-      var art = FS.readFileSync(process.cwd() + '/node_modules/triangular/config/triangularArt.txt',
-        'utf8');
-
-      // Get Version
-      var triangularVersion = require('./../package.json').version;
-      var VERSION_NAME = 'Sullust';
-
-      // Framework Details
-      console.info(art.yellow.bold);
-      console.info("Fully Operational Vertical Stack Framework Utilizing KOA, MongoDB & AngularJS"
-        .yellow.bold, ' (v'.yellow.bold + triangularVersion.yellow.bold,
-        VERSION_NAME.yellow.bold + ')'.yellow.bold);
-      console.info('c2014 Authors: Thomas Brian <github.com/tdbrian> & Brenton Gillis <github.com/brentongillis>'.grey);
-      console.info('REPO: https://github.com/tdbrian/triangular'.grey);
-      console.info('Released Under MIT Open Source License'.grey);
-      console.info('');
-
-      console.info( app.name.green + ' Running ON'.green + ' http://localhost:'.yellow +
-        String(app.port).yellow);
+      // Print startup info
+      TriangularStartupInfo(app.name, app.port);
 
       // Pass back the triangular application from the run method
       cb({

@@ -158,7 +158,7 @@ var ModelBuilder = klass({
     var modelSchemaObject = {};
 
     // Loop through each property and add to model
-    TA._.forIn(modelData, function (attributes, property) {
+    TA._.forIn(modelData.properties, function (attributes, property) {
 
       // Create the property schema object
       modelSchemaObject[property] = {};
@@ -183,6 +183,48 @@ var ModelBuilder = klass({
 
     // Create a schema based on configuration
     var schema = new Mongoose.Schema(modelSchemaObject);
+
+    // Add virtual properties
+    if(modelData.virtualProperties && TA._.size(modelData.virtualProperties)) {
+      TA._.forIn(modelData.virtualProperties, function (fn, propertyName) {
+        schema.virtual(propertyName).get(fn);
+      });
+    }
+
+    // Add instance methods
+    if(modelData.instanceMethods && TA._.size(modelData.instanceMethods)) {
+      TA._.forIn(modelData.instanceMethods, function (fn, fnName) {
+        schema.methods[fnName] = fn;
+      });
+    }
+
+    // Add static methods
+    if(modelData.staticMethods && TA._.size(modelData.staticMethods)) {
+      TA._.forIn(modelData.staticMethods, function (fn, fnName) {
+        schema.statics[fnName] = fn;
+      });
+    }
+
+    // Add overrides
+    if(modelData.setOverrides && TA._.size(modelData.setOverrides)) {
+      TA._.forIn(modelData.setOverrides, function (obj, fnName) {
+        schema.set(fnName, obj);
+      });
+    }
+
+    // Add pre functions
+    if(modelData.pre && TA._.size(modelData.pre)) {
+      TA._.forIn(modelData.pre, function (fn, fnName) {
+        schema.pre(fnName, fn);
+      });
+    }
+
+    // Add post functions
+    if(modelData.post && TA._.size(modelData.pre)) {
+      TA._.forIn(modelData.post, function (fn, fnName) {
+        schema.post(fnName, fn);
+      });
+    }
 
     // ADD ADDITIONAL METHODS TO MONGOOSE SCHEMA
 
